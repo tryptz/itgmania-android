@@ -73,6 +73,12 @@ else() # Unix
     list(APPEND SMDATA_ARCH_SOUND_SRC "arch/Sound/RageSoundDriver_OSS.cpp")
     list(APPEND SMDATA_ARCH_SOUND_HPP "arch/Sound/RageSoundDriver_OSS.h")
   endif()
+  if(WITH_LIBUSB_UAC)
+    list(APPEND SMDATA_ARCH_SOUND_SRC
+                "arch/Sound/RageSoundDriver_LibusbUAC.cpp")
+    list(APPEND SMDATA_ARCH_SOUND_HPP
+                "arch/Sound/RageSoundDriver_LibusbUAC.h")
+  endif()
 endif()
 
 source_group("Arch Specific\\\\Sound"

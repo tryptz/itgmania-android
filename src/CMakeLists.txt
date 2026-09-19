@@ -500,6 +500,13 @@ else() # Unix / Linux TODO: Remember to find and locate the zip archive files.
 
   list(APPEND SMDATA_LINK_LIB ${LIBUSB_LIBRARY})
 
+  if(WITH_LIBUSB_UAC)
+    # A CMake target, not a path, so its own libusb dependency is resolved
+    # from the target graph and its position next to the raw LIBUSB_LIBRARY
+    # entry above does not matter.
+    list(APPEND SMDATA_LINK_LIB tac_usb)
+  endif()
+
   list(APPEND SMDATA_LINK_LIB ${XRANDR_LIBRARIES} ${XINERAMA_LIBRARIES})
 
   list(REMOVE_DUPLICATES SMDATA_LINK_LIB)

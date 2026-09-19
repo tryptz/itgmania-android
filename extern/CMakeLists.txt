@@ -17,3 +17,7 @@ include(CMakeProject-miniz.cmake)
 
 # External projects
 include(CMakeProject-libusb.cmake)
+
+# Must follow libusb: it reuses that project's LIBUSB_LIBRARY so only one
+# libusb ends up in the binary.
+include(CMakeProject-tryptify-audio-core.cmake)
