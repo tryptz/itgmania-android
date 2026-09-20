@@ -59,6 +59,12 @@ class ArchHooks {
    * @return true if the user wants to quit, false otherwise. */
   static bool UserQuit() { return g_bQuitting; }
   static void SetUserQuit() { g_bQuitting = true; }
+  /* Counterpart to SetUserQuit. The flag is process-wide and was write-once,
+   * which is fine for a desktop run that exits when the loop ends. Android
+   * keeps the process alive across an activity teardown and starts the loop
+   * again on the next resume, so without a way to clear this the game would
+   * quit immediately for the rest of the process's life. */
+  static void ClearUserQuit() { g_bQuitting = false; }
 
   /*
    * Returns true if the user wants to toggle windowed mode and atomically

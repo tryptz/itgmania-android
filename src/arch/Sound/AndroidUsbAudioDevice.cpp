@@ -6,24 +6,18 @@
 #include <string>
 #include <thread>
 
+#include "AndroidJni.h"
+
 namespace {
 
-/* Handed to us by the runtime when MainActivity loads the shared object.
- * Nothing else in this .so defines JNI_OnLoad, so this is the one. */
-JavaVM* g_vm = nullptr;
+using itgmania_jni::CheckAndClearException;
+using itgmania_jni::GetApplicationContext;
+using itgmania_jni::Local;
+using itgmania_jni::ScopedEnv;
 
 /* The open connection. Its file descriptor dies with it, so the reference is
  * held for as long as tac_usb is streaming. */
 jobject g_connection = nullptr;
-
-/* Android declares AttachCurrentThread taking JNIEnv**, the desktop JDK
- * takes void**. Only difference that matters for building this file on a
- * host to check it. */
-#if defined(__ANDROID__)
-using AttachArg = JNIEnv**;
-#else
-using AttachArg = void**;
-#endif
 
 /* Constants from android.hardware.usb.UsbConstants and android.app.PendingIntent.
  * Hardcoded rather than read back through JNI: they are frozen platform ABI,
@@ -39,110 +33,6 @@ constexpr const char* kPermissionAction = "org.itgmania.android.USB_PERMISSION";
  * can reach the dialog, too long and a declined prompt hangs startup. */
 constexpr int kPermissionWaitMs = 15000;
 constexpr int kPermissionPollMs = 100;
-
-/* Attaches the calling thread if needed and detaches again on scope exit.
- * The sound driver initialises on a thread the JVM has never seen. */
-class ScopedEnv {
- public:
-  ScopedEnv() {
-    if (g_vm == nullptr) {
-      return;
-    }
-    void* raw = nullptr;
-    const jint rc = g_vm->GetEnv(&raw, JNI_VERSION_1_6);
-    if (rc == JNI_OK) {
-      env_ = static_cast<JNIEnv*>(raw);
-    } else if (rc == JNI_EDETACHED) {
-      if (g_vm->AttachCurrentThread(reinterpret_cast<AttachArg>(&env_),
-                                    nullptr) == JNI_OK) {
-        attached_ = true;
-      } else {
-        env_ = nullptr;
-      }
-    }
-  }
-
-  ~ScopedEnv() {
-    if (attached_ && g_vm != nullptr) {
-      g_vm->DetachCurrentThread();
-    }
-  }
-
-  ScopedEnv(const ScopedEnv&) = delete;
-  ScopedEnv& operator=(const ScopedEnv&) = delete;
-
-  JNIEnv* get() const { return env_; }
-  explicit operator bool() const { return env_ != nullptr; }
-
- private:
-  JNIEnv* env_ = nullptr;
-  bool attached_ = false;
-};
-
-/* Deletes a local reference on scope exit. JNI gives a bounded local frame
- * (16 slots guaranteed), and walking a device list blows through that fast. */
-template <typename T>
-class Local {
- public:
-  Local(JNIEnv* env, T ref) : env_(env), ref_(ref) {}
-  ~Local() {
-    if (ref_ != nullptr) {
-      env_->DeleteLocalRef(ref_);
-    }
-  }
-  Local(const Local&) = delete;
-  Local& operator=(const Local&) = delete;
-
-  T get() const { return ref_; }
-  explicit operator bool() const { return ref_ != nullptr; }
-
- private:
-  JNIEnv* env_;
-  T ref_;
-};
-
-/* Clears any pending exception and reports it as a failure. An exception left
- * pending makes the next JNI call abort the process, so this has to run after
- * anything that can throw. */
-bool Failed(JNIEnv* env, const char* what, std::string* error) {
-  if (env->ExceptionCheck()) {
-    env->ExceptionDescribe();  // goes to logcat, where it is actually readable
-    env->ExceptionClear();
-    if (error != nullptr) {
-      *error = std::string(what) + " threw a Java exception (see logcat)";
-    }
-    return true;
-  }
-  return false;
-}
-
-/* The Application object, via android.app.ActivityThread.currentApplication().
- * The harness keeps its Activity reference in an anonymous namespace, so it
- * cannot be borrowed from here; this is the documented way to reach a Context
- * with nothing but a JNIEnv. Returns a local reference. */
-jobject GetApplicationContext(JNIEnv* env, std::string* error) {
-  Local<jclass> activityThread(env, env->FindClass("android/app/ActivityThread"));
-  if (!activityThread || Failed(env, "FindClass(ActivityThread)", error)) {
-    if (error->empty()) *error = "android.app.ActivityThread not found";
-    return nullptr;
-  }
-  const jmethodID currentApplication = env->GetStaticMethodID(
-      activityThread.get(), "currentApplication", "()Landroid/app/Application;");
-  if (currentApplication == nullptr ||
-      Failed(env, "GetStaticMethodID(currentApplication)", error)) {
-    if (error->empty()) *error = "ActivityThread.currentApplication() not found";
-    return nullptr;
-  }
-  jobject context =
-      env->CallStaticObjectMethod(activityThread.get(), currentApplication);
-  if (Failed(env, "currentApplication()", error)) {
-    return nullptr;
-  }
-  if (context == nullptr && error != nullptr) {
-    *error = "No Application context yet — the process is not fully started";
-  }
-  return context;
-}
 
 /* True if any interface on the device is USB audio streaming. Checking the
  * interfaces rather than the device class is deliberate: a UAC device reports
@@ -231,7 +121,7 @@ bool RequestPermission(JNIEnv* env, jobject usbManager, jclass managerClass,
   Local<jstring> action(env, env->NewStringUTF(kPermissionAction));
   Local<jobject> intent(
       env, env->NewObject(intentClass.get(), intentCtor, action.get()));
-  if (!intent || Failed(env, "new Intent", error)) {
+  if (!intent || CheckAndClearException(env, "new Intent", error)) {
     return false;
   }
 
@@ -240,12 +130,12 @@ bool RequestPermission(JNIEnv* env, jobject usbManager, jclass managerClass,
       env, env->CallStaticObjectMethod(pendingClass.get(), getBroadcast, context,
                                        0, intent.get(),
                                        kPendingIntentFlagImmutable));
-  if (!pending || Failed(env, "PendingIntent.getBroadcast", error)) {
+  if (!pending || CheckAndClearException(env, "PendingIntent.getBroadcast", error)) {
     return false;
   }
 
   env->CallVoidMethod(usbManager, requestPermission, device, pending.get());
-  if (Failed(env, "UsbManager.requestPermission", error)) {
+  if (CheckAndClearException(env, "UsbManager.requestPermission", error)) {
     return false;
   }
 
@@ -268,11 +158,6 @@ bool RequestPermission(JNIEnv* env, jobject usbManager, jclass managerClass,
 
 }  // namespace
 
-extern "C" JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* /*reserved*/) {
-  g_vm = vm;
-  return JNI_VERSION_1_6;
-}
-
 namespace itgmania_usb {
 
 int AcquireDeviceFd(std::string* error) {
@@ -282,7 +167,7 @@ int AcquireDeviceFd(std::string* error) {
   }
   error->clear();
 
-  if (g_vm == nullptr) {
+  if (itgmania_jni::GetJavaVM() == nullptr) {
     *error = "No JavaVM — JNI_OnLoad never ran, so this is not an Android build";
     return -1;
   }
@@ -314,7 +199,7 @@ int AcquireDeviceFd(std::string* error) {
   Local<jobject> usbManager(env, env->CallObjectMethod(
                                      context.get(), getSystemService,
                                      usbService.get()));
-  if (!usbManager || Failed(env, "getSystemService(usb)", error)) {
+  if (!usbManager || CheckAndClearException(env, "getSystemService(usb)", error)) {
     if (error->empty()) *error = "No USB service on this device";
     return -1;
   }
@@ -338,7 +223,7 @@ int AcquireDeviceFd(std::string* error) {
 
   Local<jobject> deviceMap(
       env, env->CallObjectMethod(usbManager.get(), getDeviceList));
-  if (!deviceMap || Failed(env, "getDeviceList", error)) {
+  if (!deviceMap || CheckAndClearException(env, "getDeviceList", error)) {
     if (error->empty()) *error = "Could not list USB devices";
     return -1;
   }
@@ -349,7 +234,7 @@ int AcquireDeviceFd(std::string* error) {
   Local<jobject> collection(
       env, values != nullptr ? env->CallObjectMethod(deviceMap.get(), values)
                              : nullptr);
-  if (!collection || Failed(env, "HashMap.values", error)) {
+  if (!collection || CheckAndClearException(env, "HashMap.values", error)) {
     if (error->empty()) *error = "Could not read the USB device list";
     return -1;
   }
@@ -360,7 +245,7 @@ int AcquireDeviceFd(std::string* error) {
   Local<jobject> it(env, iterator != nullptr ? env->CallObjectMethod(
                                                    collection.get(), iterator)
                                              : nullptr);
-  if (!it || Failed(env, "Collection.iterator", error)) {
+  if (!it || CheckAndClearException(env, "Collection.iterator", error)) {
     if (error->empty()) *error = "Could not iterate USB devices";
     return -1;
   }
@@ -409,7 +294,7 @@ int AcquireDeviceFd(std::string* error) {
 
     jobject connection =
         env->CallObjectMethod(usbManager.get(), openDevice, device.get());
-    if (connection == nullptr || Failed(env, "UsbManager.openDevice", error)) {
+    if (connection == nullptr || CheckAndClearException(env, "UsbManager.openDevice", error)) {
       if (error->empty()) {
         *error =
             "openDevice() returned null — another process may hold the DAC";
@@ -427,7 +312,7 @@ int AcquireDeviceFd(std::string* error) {
       return -1;
     }
     const jint fd = env->CallIntMethod(connection, getFd);
-    if (fd < 0 || Failed(env, "getFileDescriptor", error)) {
+    if (fd < 0 || CheckAndClearException(env, "getFileDescriptor", error)) {
       env->DeleteLocalRef(connection);
       if (error->empty()) *error = "The USB connection gave no descriptor";
       return -1;
@@ -450,7 +335,7 @@ int AcquireDeviceFd(std::string* error) {
 }
 
 void Release() {
-  if (g_connection == nullptr || g_vm == nullptr) {
+  if (g_connection == nullptr || itgmania_jni::GetJavaVM() == nullptr) {
     return;
   }
   ScopedEnv scoped;
