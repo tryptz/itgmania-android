@@ -16,6 +16,10 @@
 #include "global.h"
 #include "libusb_uac_driver.h"
 
+#if defined(__ANDROID__)
+#include "AndroidUsbAudioDevice.h"
+#endif
+
 REGISTER_SOUND_DRIVER_CLASS2("LibusbUAC", LibusbUAC);
 
 using monotrypt::usb::LibusbUacDriver;
@@ -47,12 +51,28 @@ RageSoundDriver_LibusbUAC::RageSoundDriver_LibusbUAC()
       m_iRingFrames(0) {}
 
 std::string RageSoundDriver_LibusbUAC::OpenDevice() {
-  if (g_iDeviceFd < 0) {
+  int iFd = g_iDeviceFd;
+
+#if defined(__ANDROID__)
+  if (iFd < 0) {
+    /* Nobody called SetDeviceFd, so go and find a DAC ourselves. This asks
+     * UsbManager through JNI and may put up the permission dialog, so it can
+     * block for as long as a person takes to answer it. */
+    std::string sUsbError;
+    iFd = itgmania_usb::AcquireDeviceFd(&sUsbError);
+    if (iFd < 0) {
+      return sUsbError.empty() ? "Could not open a USB audio device"
+                               : sUsbError;
+    }
+  }
+#endif
+
+  if (iFd < 0) {
     /* A desktop build would open by VID/PID here and detach the kernel's
-     * snd-usb-audio driver from the streaming interface. tac_usb has no
-     * such entry point today — open() takes a file descriptor only,
-     * because on Android the OS will not let a process enumerate USB. Until
-     * tac_usb grows openByVidPid(), this driver is Android-only. */
+     * snd-usb-audio driver from the streaming interface. tac_usb has no such
+     * entry point today — open() takes a file descriptor only, because on
+     * Android the OS will not let a process enumerate USB. Until it grows
+     * openByVidPid(), this driver needs an Android host. */
     return "No USB device descriptor was supplied (SetDeviceFd was never "
            "called). This driver currently requires an Android host.";
   }
@@ -60,8 +80,8 @@ std::string RageSoundDriver_LibusbUAC::OpenDevice() {
   if (!m_pDriver->ensureContext()) {
     return "Could not create a libusb context.";
   }
-  if (!m_pDriver->open(g_iDeviceFd)) {
-    return ssprintf("Could not open USB device on fd %i.", g_iDeviceFd);
+  if (!m_pDriver->open(iFd)) {
+    return ssprintf("Could not open USB device on fd %i.", iFd);
   }
   return "";
 }
@@ -143,6 +163,13 @@ RageSoundDriver_LibusbUAC::~RageSoundDriver_LibusbUAC() {
     delete m_pDriver;
     m_pDriver = nullptr;
   }
+
+#if defined(__ANDROID__)
+  /* Only after tac_usb is closed: the descriptor belongs to the
+   * UsbDeviceConnection, and releasing it first would pull the fd out from
+   * under the iso pump mid-teardown. */
+  itgmania_usb::Release();
+#endif
 }
 
 int RageSoundDriver_LibusbUAC::MixerThread_start(void* p) {

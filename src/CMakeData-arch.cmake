@@ -86,6 +86,15 @@ else() # Unix
                 "arch/Sound/RageSoundDriver_LibusbUAC.cpp")
     list(APPEND SMDATA_ARCH_SOUND_HPP
                 "arch/Sound/RageSoundDriver_LibusbUAC.h")
+    if(ANDROID)
+      # Reaches UsbManager by JNI reflection, so it needs jni.h — present in
+      # the NDK, not guaranteed on a desktop host. Also where JNI_OnLoad
+      # lives, and there must be exactly one of those per shared object.
+      list(APPEND SMDATA_ARCH_SOUND_SRC
+                  "arch/Sound/AndroidUsbAudioDevice.cpp")
+      list(APPEND SMDATA_ARCH_SOUND_HPP
+                  "arch/Sound/AndroidUsbAudioDevice.h")
+    endif()
   endif()
 endif()
 

@@ -50,10 +50,12 @@ class RageSoundDriver_LibusbUAC : public RageSoundDriver {
 
   void SetupDecodingThread();
 
-  /* Android hands us a file descriptor from UsbDeviceConnection, because the
-   * OS will not let a process enumerate USB directly. Call this before the
-   * driver is created; Init() fails cleanly if it was never called. On a
-   * desktop build this stays -1 and OpenDevice() takes the VID/PID path. */
+  /* Optional override. Android will not let a process enumerate USB
+   * directly, so a device is opened through UsbManager and what crosses to
+   * native is a UsbDeviceConnection file descriptor. Left alone, Init() goes
+   * and gets one itself (see AndroidUsbAudioDevice.h); call this first to
+   * hand it a descriptor you already hold — a device the app chose, or one
+   * passed in from a USB_DEVICE_ATTACHED intent. */
   static void SetDeviceFd(int fd);
 
  private:
