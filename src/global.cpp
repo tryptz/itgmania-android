@@ -21,7 +21,7 @@ using CrashHandler::DebugBreak;
 using CrashHandler::IsDebuggerPresent;
 #endif
 
-#if defined(UNIX) || defined(MACOSX)
+#if defined(UNIX) || defined(MACOSX) || defined(ANDROID)
 #include "archutils/Unix/CrashHandler.h"
 #endif
 

@@ -22,7 +22,8 @@ if(ANDROID)
   # Shared JNI plumbing plus user-visible storage. Listed here rather than with
   # the sound driver because storage stands alone, and because AndroidJni holds
   # the single JNI_OnLoad this shared object is allowed to have.
-  list(APPEND SMDATA_GLOBAL_FILES_SRC "AndroidJni.cpp" "AndroidStorage.cpp")
+  list(APPEND SMDATA_GLOBAL_FILES_SRC "AndroidJni.cpp" "AndroidStorage.cpp"
+              "archutils/Android/CrashHandler_Android.cpp")
   list(APPEND SMDATA_GLOBAL_FILES_HPP "AndroidJni.h" "AndroidStorage.h")
 endif()
 

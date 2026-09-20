@@ -109,7 +109,13 @@ else()
       list(APPEND SMDATA_OS_SRC "archutils/Unix/X11Helper.cpp")
       list(APPEND SMDATA_OS_HPP "archutils/Unix/X11Helper.h")
     endif()
-    if(HAS_PTHREAD)
+    # Not on Android: the platform layer there supplies its own
+    # GetCurrentThreadId / SuspendThread / ResumeThread, because this file used
+    # to compile to nothing on that target -- neither UNIX nor LINUX was
+    # defined, so both of its branches were skipped. Now that the build does
+    # define them, compiling both gives two definitions of each and the link
+    # fails.
+    if(HAS_PTHREAD AND NOT ANDROID)
       list(APPEND SMDATA_OS_SRC "archutils/Common/PthreadHelpers.cpp")
       list(APPEND SMDATA_OS_HPP "archutils/Common/PthreadHelpers.h")
     endif()

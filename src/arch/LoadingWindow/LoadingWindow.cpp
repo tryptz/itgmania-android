@@ -11,9 +11,6 @@
 #include "arch/arch_default.h"
 #include "global.h"
 
-LoadingWindow::LoadingWindow()
-    : m_progress(0), m_totalWork(1), m_indeterminate(false) {}
-
 LoadingWindow* LoadingWindow::Create() {
   if (!PREFSMAN->m_bShowLoadingWindow) {
     return new LoadingWindow_Null;

@@ -18,7 +18,7 @@
 
 #if defined(_WIN32)
 #include "archutils/Win32/crash.h"
-#elif defined(LINUX) || defined(MACOSX)
+#elif defined(LINUX) || defined(MACOSX) || defined(ANDROID)
 #include "archutils/Unix/CrashHandler.h"
 #endif
 

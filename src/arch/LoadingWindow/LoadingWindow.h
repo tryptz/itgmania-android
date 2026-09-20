@@ -9,7 +9,11 @@ class LoadingWindow {
  public:
   static LoadingWindow* Create();
 
-  LoadingWindow();
+  /* Defaulted inline, with the members initialized in-class below. It used to
+   * be defined in LoadingWindow.cpp, which meant any build that supplies its
+   * own loading window and drops that file -- the Android port does exactly
+   * that -- failed to link on this constructor alone. */
+  LoadingWindow() = default;
   virtual std::string Init() { return std::string(); }
   virtual ~LoadingWindow() {}
 
@@ -23,9 +27,9 @@ class LoadingWindow {
   }
 
  protected:
-  int m_progress;
-  int m_totalWork;
-  bool m_indeterminate;
+  int m_progress = 0;
+  int m_totalWork = 1;
+  bool m_indeterminate = false;
 };
 
 #endif
