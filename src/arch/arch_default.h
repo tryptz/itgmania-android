@@ -87,6 +87,13 @@ inline const std::vector<std::string>& GetDefaultMovieDriverList() {
 // PulseAudio daemon has been suspended by/for jackd.
 inline const std::vector<std::string>& GetDefaultSoundDriverList() {
   static const std::vector<std::string> soundDriverList = {
+#ifdef WITH_LIBUSB_UAC
+      // Ahead of the mixers deliberately: when a USB Audio Class DAC is
+      // attached this is the bit-perfect path to it, and Create() moves to
+      // the next entry as soon as Init() reports there is no device, so a
+      // machine without one just falls through to Pulse as before.
+      "LibusbUAC",
+#endif
       "Pulse", "ALSA-sw", "OSS", "JACK", "Null"};
   return soundDriverList;
 }

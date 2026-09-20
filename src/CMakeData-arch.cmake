@@ -82,6 +82,13 @@ else() # Unix
     include("${SM_EXTERN_DIR}/CMakeProject-tryptify-audio-core.cmake")
   endif()
   if(WITH_LIBUSB_UAC)
+    # Lets arch_default.h name the driver in the default list only when it is
+    # actually built, so a normal build does not advertise a driver that was
+    # never registered. Set here rather than in the extern project file
+    # because this file is included into the scope that creates the targets:
+    # src/ on a desktop build, the harness's cpp directory on Android. Both
+    # include it before any target exists.
+    add_compile_definitions(WITH_LIBUSB_UAC)
     list(APPEND SMDATA_ARCH_SOUND_SRC
                 "arch/Sound/RageSoundDriver_LibusbUAC.cpp")
     list(APPEND SMDATA_ARCH_SOUND_HPP
