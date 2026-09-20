@@ -1,0 +1,25 @@
+#ifndef CONFIG_HPP_
+#define CONFIG_HPP_
+
+/*
+ * Compatibility shim for the Android harness, which still does
+ *
+ *     configure_file("${SM_SRC_DIR}/config.hpp.in" ".../config.hpp")
+ *
+ * ITGMania removed this file in 6dd0c1a ("Kill config.hpp"), which renamed it
+ * to Platform.h and moved everything that used to include it across. Nothing
+ * in the tree includes config.hpp any more, and nothing in the harness does
+ * either — the configure_file is vestigial, and it aborts the Android
+ * configure step only because the input is gone.
+ *
+ * So this forwards to where the contents actually live rather than
+ * duplicating them, which keeps it correct if Platform.h changes again. It is
+ * inert on a desktop build: StepmaniaCore.cmake only configures verstub.cpp.in,
+ * so nothing ever reads this file there.
+ *
+ * The cleaner fix is one line in the harness — drop the configure_file — at
+ * which point this can go.
+ */
+#include "Platform.h"
+
+#endif
