@@ -36,6 +36,9 @@
 #include "RageTimer.h"
 #include "RageUtil/Regex.h"
 #include "Screen.h"
+#if defined(ANDROID)
+#include "AndroidContentSetup.h"
+#endif
 #include "arch/ArchHooks/ArchHooks.h"
 #include "arch/Dialog/Dialog.h"
 #include "arch/LoadingWindow/LoadingWindow.h"
@@ -833,6 +836,20 @@ int sm_main(int argc, char* argv[]) {
       "dirro", PREFSMAN->m_sAdditionalCourseFoldersReadOnly.Get(), "/Courses");
   MountFolders(
       "dir", PREFSMAN->m_sAdditionalCourseFoldersWritable.Get(), "/Courses");
+
+#if defined(ANDROID)
+  // Shared storage is the only place a person can actually put song folders on
+  // Android 11 and later, so bring it in alongside the app's own content. This
+  // has to happen before SongManager scans: importing afterwards would leave
+  // everything invisible until the next launch. Empty means shared storage is
+  // not readable yet, which is normal until the All-files grant is given.
+  {
+    const std::string sAndroidSongs = AndroidContentSetup::Prepare();
+    if (!sAndroidSongs.empty()) {
+      FILEMAN->Mount("dir", sAndroidSongs, "/Songs");
+    }
+  }
+#endif
 
   MountTreeOfZips(SpecialFiles::PACKAGES_DIR);
 

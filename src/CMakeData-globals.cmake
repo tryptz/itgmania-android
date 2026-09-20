@@ -23,8 +23,10 @@ if(ANDROID)
   # the sound driver because storage stands alone, and because AndroidJni holds
   # the single JNI_OnLoad this shared object is allowed to have.
   list(APPEND SMDATA_GLOBAL_FILES_SRC "AndroidJni.cpp" "AndroidStorage.cpp"
+              "AndroidContentSetup.cpp"
               "archutils/Android/CrashHandler_Android.cpp")
-  list(APPEND SMDATA_GLOBAL_FILES_HPP "AndroidJni.h" "AndroidStorage.h")
+  list(APPEND SMDATA_GLOBAL_FILES_HPP "AndroidJni.h" "AndroidStorage.h"
+              "AndroidContentSetup.h")
 endif()
 
 source_group("Global Files"
