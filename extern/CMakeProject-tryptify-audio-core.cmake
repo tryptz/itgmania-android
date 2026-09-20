@@ -11,6 +11,14 @@ if(NOT WITH_LIBUSB_UAC)
   return()
 endif()
 
+# Two include sites reach this file: extern/CMakeLists.txt on a desktop
+# build, and CMakeData-arch.cmake for the Android harness, which never
+# processes extern/CMakeLists.txt. Whichever runs first wins; a second pass
+# would otherwise add_subdirectory() the same project twice.
+if(TARGET tac_usb)
+  return()
+endif()
+
 set(TAC_DIR "${SM_EXTERN_DIR}/tryptify-audio-core")
 if(NOT EXISTS "${TAC_DIR}/CMakeLists.txt")
   message(FATAL_ERROR

@@ -73,6 +73,14 @@ else() # Unix
     list(APPEND SMDATA_ARCH_SOUND_SRC "arch/Sound/RageSoundDriver_OSS.cpp")
     list(APPEND SMDATA_ARCH_SOUND_HPP "arch/Sound/RageSoundDriver_OSS.h")
   endif()
+  # The Android harness (Austin-Scott/itgmania-android) points
+  # ITGMANIA_SOURCE_ROOT at this tree and includes the CMakeData-*.cmake
+  # files directly — it never processes extern/CMakeLists.txt, so the option
+  # and the tac_usb target have to be reachable from here too. The project
+  # file returns early if a desktop build already set it up.
+  if(EXISTS "${SM_EXTERN_DIR}/CMakeProject-tryptify-audio-core.cmake")
+    include("${SM_EXTERN_DIR}/CMakeProject-tryptify-audio-core.cmake")
+  endif()
   if(WITH_LIBUSB_UAC)
     list(APPEND SMDATA_ARCH_SOUND_SRC
                 "arch/Sound/RageSoundDriver_LibusbUAC.cpp")
